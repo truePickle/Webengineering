@@ -1,5 +1,8 @@
 let token;
 let authHeader;
+let matchList = null;
+let currPath = "";
+let pathHistory = [];
 
 function login(event) 
 {
@@ -31,8 +34,8 @@ function login(event)
 
       		document.getElementById("error").innerText = "";
 			//gets the folders of the basic page
-			let stuff = getContentFolder();
-			showFileExplorer();
+			getContentFolder();
+			
     	}
     	else if (logInRequest.readyState == 4 && logInRequest.status == 401) {
       		//if login data wrong status is 401 Unauthorized
@@ -76,34 +79,8 @@ function logout(){
 
 	return false;
 }
-
-function getContentFolder(folderName = ""){
-	var xhr = new XMLHttpRequest();
-	var url = "http://localhost:8080/"+folderName;
-
-	//opens request and sets auth header
-	xhr.open("GET", url, true);
-	xhr.setRequestHeader("Authorization", authHeader);
-
-	xhr.onreadystatechange = function() {
-	  if (xhr.readyState == 4) {
-	    if (xhr.status == 200) {
-	      // Request completed successfully
-	      var response = xhr.responseText;
-	      console.log(response);
-	      // Process the response as needed
-	    } 
-		else {
-	      // Request failed
-	      console.error("Request failed with status: " + xhr.status);
-	    }
-	  }
-	};
-
-	xhr.send();
-}
-
-function showFileExplorer(contents = null) {
+//refreshes the File explorer
+function refreshFileExplorer() {
 	// Clear the existing content
 	document.body.innerHTML = '';
 	document.head.innerHTML = `
@@ -153,6 +130,12 @@ function showFileExplorer(contents = null) {
 		align-items: center;
 		cursor: pointer;
 	  }
+
+	  .deleteButton{
+
+		padding: 10px:
+		background-color: #f44336;
+	  }
   
 	  .folderIcon {
 		margin-right: 10px;
@@ -161,8 +144,6 @@ function showFileExplorer(contents = null) {
 	  .fileIcon {
 		margin-right: 10px;
 	  }
-  
-	  /* Add more styling as needed */
 	</style>
 	<script src="script.js"></script>`
 
@@ -174,20 +155,87 @@ function showFileExplorer(contents = null) {
 	  <div id="fileExplorer"></div>
 	`
 
-	//let explorerDiv = document.body.getElementById("fileExplorer");
+	let explorerDiv = document.getElementById("fileExplorer");
 
 	// Process the provided contents (folders/files)
-	if(contents != null){
-		for (var i = 0; i < contents.length; i++) {
-	  	var item = document.createElement('div');
-	  	item.className = 'explorerItem';
-	  	item.textContent = contents[i];
-	  	explorerDiv.appendChild(item);
+	if(matchList != null){
+		for (var i = 0; i < matchList.length; i++) {
+			var folderDiv = document.createElement("div");
+			folderDiv.className = 'explorerItem';
+			
+
+	  		var button = document.createElement('button');
+	  		button.className = 'explorerItem';
+
+			var buttonDelete = document.createElement("button");
+			buttonDelete.className = "deleteButton";
+
+			let text = matchList[i][1];
+			let icon = document.createElement('span');
+			icon.className = "folderIcon";
+			icon.textContent = "Folder"
+
+			if(matchList[i][2] == "dir"){
+				icon.textContent = "📁";
+				button.addEventListener("click", function() {
+					getContentFolder(this);
+				});
+				buttonDelete.addEventListener("click", function() {
+					deleteFolder(this);
+				});
+			}
+			else{
+				icon.textContent = "📄";
+				button.addEventListener("click", function() {
+					getContentFile(this);
+				});
+				buttonDelete.addEventListener("click", function() {
+					deleteFile(this);
+				});
+			}
+			button.setAttribute("Name",text);
+	  		button.textContent = text;
+
+			buttonDelete.setAttribute("Name",text);
+			buttonDelete.textContent = "Delete";
+
+			button.setAttribute("fileType", matchList[i][2]);
+
+			folderDiv.appendChild(icon);
+	  		folderDiv.appendChild(button);
+			folderDiv.appendChild(buttonDelete);
+			explorerDiv.appendChild(folderDiv);
+			explorerDiv.appendChild(document.createElement('br'));
 		}
 	}
-	// You can add your CSS styling here or link to an external stylesheet
-  }
+	var uploadButton = document.createElement("button");
+	uploadButton.className = "uploadButton";
+	uploadButton.addEventListener("click", function() {
+		uploadFile();
+	});
+	uploadButton.textContent = "Upload a File";
+	document.body.appendChild(uploadButton);
 
+	var createButton = document.createElement("button");
+	createButton.className = "createButton";
+	createButton.addEventListener("click", function() {
+		createTextFile();
+	});
+	createButton.textContent = "Create a Text File";
+	document.body.appendChild(createButton);
+
+	var backButton = document.createElement("button");
+	backButton.className = "backButton";
+	backButton.addEventListener("click", function() {
+		goBack();
+	});
+	backButton.textContent = "Go Back";
+	document.body.appendChild(backButton);
+
+
+}
+
+  //resets the page to the login in website
   function resetToLogin() {
 	document.head.innerHTML = `<title>Login Page</title>
 	<style>
@@ -241,6 +289,249 @@ function showFileExplorer(contents = null) {
 	  </form>
 	  <p id ="error" style="color: red;"></p>
 	`;
+	currPath = "";
 
-  }
+}
+//if no argument refreshes current Page from currPath or opens new folder if argument given
+function getContentFolder(folder = null){
+	var folderName = "";
+	if(folder != null){
+		folderName = folder.name;
+	}
+	var xhr = new XMLHttpRequest();
+	currPath = currPath + folderName +"/"
+	var url = "http://localhost:8080"+ currPath.substring(0, currPath.length - 1);
+
+	//opens request and sets auth header
+	xhr.open("GET", url, true);
+	xhr.setRequestHeader("Authorization", authHeader);
+
+	xhr.onload = function() {
+	  if (xhr.readyState == 4) {
+	    if (xhr.status == 200) {
+	      	// Request completed successfully
+	      	var response = xhr.responseText;
+
+			const regex = /{"Name":"(.*?)","Type":"(.*?)"}/g;
+			matchList = [...response.matchAll(regex)];
+			refreshFileExplorer();
+	    } 
+		else {
+	      // Request failed
+	      console.error("Request failed with status: " + xhr.status);
+	    }
+	  }
+	};
+
+	xhr.send();
+	return false;
+}
   
+
+  function getContentFile(file)
+  {
+	var request = new XMLHttpRequest();
+	var path = currPath + file.name +"/"
+	var url = "http://localhost:8080"+ path.substring(0, path.length - 1);
+
+	//opens request and sets auth header
+	request.open("GET", url, true);
+	request.setRequestHeader("Authorization", authHeader);
+	request.responseType = "blob"
+  
+	request.onload = function () //eine if-Bedingung fuer jeden Typ
+	{
+		var explorerDiv = document.getElementById("fileExplorer");
+		//gets the file Type of the file i.e. image or text etc. from the name ending
+	  	if (file.name.includes(".mp4"))
+	  	{
+			var videoTag = document.createElement("video");
+			videoTag.controls = true;
+			videoTag.src = URL.createObjectURL(request.response);
+			videoTag.type = file.fileType;
+			explorerDiv.innerHTML = ""; 
+			explorerDiv.appendChild(videoTag);
+			explorerDiv.style.display = "block";
+	  	} else if (file.name.includes(".img"))
+	  	{
+			var imgTag = document.createElement("img");
+			imgTag.src = URL.createObjectURL(request.response);
+			explorerDiv.innerHTML = ""; 
+			explorerDiv.appendChild(imgTag);
+			explorerDiv.style.display = "block"; 
+	  	} else if (file.name.includes(".mp3"))
+	  	{
+			var audioTag = document.createElement("audio");
+			audioTag.controls = true;
+			audioTag.src = URL.createObjectURL(request.response);
+			explorerDiv.innerHTML = ""; 
+			explorerDiv.appendChild(audioTag);
+			explorerDiv.style.display = "block"; 
+	  	} else if (file.name.includes("txt"))
+	  	{
+			var reader = new FileReader();
+			reader.onload = function ()
+			{
+			  var textContainer = document.createElement("pre");
+			  textContainer.textContent = reader.result;
+			  explorerDiv.innerHTML = ""; 
+			  explorerDiv.appendChild(textContainer);
+			  explorerDiv.style.display = "block"; 
+			};
+			reader.readAsText(request.response);
+	  	}
+	};
+	request.send();
+  }
+
+  //deletes a file
+  function deleteFile(file)
+  	{
+	var path = currPath + file.name;
+	var url = "http://localhost:8080"+ path;
+
+	var request = new XMLHttpRequest();
+	request.open("DELETE", url);
+	request.setRequestHeader("Authorization", authHeader);
+
+	request.onload = function ()
+	{
+	  if (request.status === 200)
+	  {
+		console.log(request.response);
+		getContentFolder();
+	  } 
+	  else
+	  {
+		alert(request.response);
+	  }
+	};
+
+	request.send();
+	return false;
+}
+
+  //deletes a folder
+  function deleteFolder(file)
+  	{
+	var path = currPath + file.name;
+	var url = "http://localhost:8080"+ path;
+  
+	var request = new XMLHttpRequest();
+	request.open("DELETE", url);
+	request.setRequestHeader("Authorization", authHeader);
+  
+	request.onload = function ()
+	{
+	  if (request.status === 200)
+	  {
+		console.log(request.response);
+		getContentFolder();
+	  } 
+	  else
+	  {
+		alert(request.response);
+	  }
+	};
+  
+	request.send();
+	return false;
+  }
+
+  function createTextFile()
+  {
+	var fileName = prompt("Enter the name for the new text file:");
+	if (!fileName.endsWith(".txt"))
+	{
+	  fileName = fileName.concat(".txt");
+	}
+	if (fileName)
+	{
+	  var path = currPath + fileName;
+	  var request = new XMLHttpRequest();
+	  var url = "http://localhost:8080"+ path;
+	  request.open("POST", url);
+	  request.setRequestHeader("Authorization", authHeader);
+	  request.setRequestHeader("Content-Type", "text/plain");
+	  request.onload = function ()
+	  {
+		if (request.status === 200)
+		{
+			console.log(request.response);
+			getContentFolder();
+		} 
+		else
+		{
+		  console.error("Failed to create text file");
+		  alert("Failed to create text file");
+		}
+	  };
+	  request.send("type=text");
+	}
+	return false;
+  }
+
+  //upload a local file from your computer
+  function uploadFile()
+  {
+	var fileInput = document.createElement("input");
+	fileInput.type = "file";
+	fileInput.accept = ".*"; 
+	
+	fileInput.addEventListener("change", function (event)
+	{
+	  var file = event.target.files[0];
+	  if (file)
+	  {
+		var reader = new FileReader();
+		reader.onload = function ()
+		{
+		  var base64Data = reader.result.split(",")[1];
+		  var requestData = "content=" + encodeURIComponent(base64Data);
+		  var request = new XMLHttpRequest();
+		  var path = currPath + file.name
+		  var url = "http://localhost:8080"+ path;
+		  request.open("POST", url);
+		  request.setRequestHeader("Authorization", authHeader);
+		  request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+		  request.onload = function ()
+		  {
+			if (request.status === 200)
+			{
+				console.log(request.response);
+				getContentFolder();
+			} 
+			else
+			{
+			  console.error("Failed to upload file");
+			  alert("Failed to upload file");
+			}
+		  };
+  
+		  request.send(requestData);
+		};
+		reader.readAsDataURL(file);
+	  }
+	});
+  
+	//loest Eingabedialog fuer die Datei aus
+	fileInput.click();
+	return false;
+  }
+
+function goBack(){
+	//checks if last char in currPath is / and removes it
+	if(currPath.substring(currPath.length-1, currPath.length) === "/"){
+		currPath = currPath.substring(0, currPath.length-1);
+	}
+	//divides currentPath into levels
+	var levels = currPath.substring(0, currPath.length-1).split("/");
+	currPath = "";
+	//rebuilds currPath without last level
+	for(var i=0; i<levels.length-1;i++){
+		currPath = currPath + levels[i] + "/" 
+	}
+	//refreshes the Page so the new path is shown
+	getContentFolder();
+}
