@@ -208,6 +208,7 @@ function refreshFileExplorer() {
 			explorerDiv.appendChild(document.createElement('br'));
 		}
 	}
+	//the upload button
 	var uploadButton = document.createElement("button");
 	uploadButton.className = "uploadButton";
 	uploadButton.addEventListener("click", function() {
@@ -216,14 +217,25 @@ function refreshFileExplorer() {
 	uploadButton.textContent = "Upload a File";
 	document.body.appendChild(uploadButton);
 
-	var createButton = document.createElement("button");
-	createButton.className = "createButton";
-	createButton.addEventListener("click", function() {
+	//the create file button
+	var createFileButton = document.createElement("button");
+	createFileButton.className = "createButton";
+	createFileButton.addEventListener("click", function() {
 		createTextFile();
 	});
-	createButton.textContent = "Create a Text File";
-	document.body.appendChild(createButton);
+	createFileButton.textContent = "Create a Text File";
+	document.body.appendChild(createFileButton);
 
+	//the create Folder button
+	var createFolderButton = document.createElement("button");
+	createFolderButton.className = "createButton";
+	createFolderButton.addEventListener("click", function() {
+		createFolder();
+	});
+	createFolderButton.textContent = "Create a Folder";
+	document.body.appendChild(createFolderButton);
+
+	//the go back button
 	var backButton = document.createElement("button");
 	backButton.className = "backButton";
 	backButton.addEventListener("click", function() {
@@ -470,6 +482,35 @@ function getContentFolder(folder = null){
 	}
 	return false;
   }
+
+  function createFolder()
+{
+  var directoryName = prompt("Enter the name for the new directory:");
+  if (directoryName)
+  {
+    var path = currPath + directoryName;
+	var url = "http://localhost:8080"+ path;
+
+    var request = new XMLHttpRequest();
+    request.open("POST", url);
+    request.setRequestHeader("Authorization", authHeader);
+    request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    request.onload = function ()
+    {
+      if (request.status === 200)
+      {
+        console.log(request.response);
+		getContentFolder();
+      } 
+	  else
+      {
+        alert("Failed to create directory");
+      }
+    };
+    request.send("type=dir");
+  }
+  return false;
+}
 
   //upload a local file from your computer
   function uploadFile()
